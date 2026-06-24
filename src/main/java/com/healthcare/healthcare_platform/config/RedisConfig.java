@@ -1,6 +1,5 @@
 package com.healthcare.healthcare_platform.config;
 
-import io.lettuce.core.RedisURI;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +10,8 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
+import java.net.URI;
+
 @Configuration
 public class RedisConfig {
 
@@ -19,17 +20,25 @@ public class RedisConfig {
 
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
-        RedisURI redisURI = RedisURI.create(redisUrl);
+        try {
+            URI uri = new URI(redisUrl);
 
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-        config.setHostName(redisURI.getHost());
-        config.setPort(redisURI.getPort());
+            RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+            config.setHostName(uri.getHost());
+            config.setPort(uri.getPort());
 
-        if (redisURI.getPassword() != null && redisURI.getPassword().length > 0) {
-            config.setPassword(new String(redisURI.getPassword()));
+            String userInfo = uri.getUserInfo();
+            if (userInfo != null && userInfo.contains(":")) {
+                String password = userInfo.substring(userInfo.indexOf(":") + 1);
+                if (!password.isEmpty()) {
+                    config.setPassword(password);
+                }
+            }
+
+            return new LettuceConnectionFactory(config);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse Redis URL: " + redisUrl, e);
         }
-
-        return new LettuceConnectionFactory(config);
     }
 
     @Bean
