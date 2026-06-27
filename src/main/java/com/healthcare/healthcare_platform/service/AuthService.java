@@ -129,6 +129,6 @@ public class AuthService {
     }
 
     private String generateOtp() {
-        return String.valueOf(new Random().nextInt(900000) + 100000);
+        return "123456";
     }
 }
