@@ -49,4 +49,43 @@ public class AuthController {
                 request.get("otp")
         ));
     }
+
+    // NEW — set password after OTP verified
+    @PostMapping("/set-password")
+    public ResponseEntity<String> setPassword(@RequestBody Map<String, String> request) {
+        return ResponseEntity.ok(authService.setPassword(
+                request.get("identifier"),
+                request.get("password")
+        ));
+    }
+
+    // NEW — login with email/phone + password
+    @PostMapping("/login")
+    public ResponseEntity<String> login(@RequestBody Map<String, String> request) {
+        return ResponseEntity.ok(authService.login(
+                request.get("identifier"),
+                request.get("password")
+        ));
+    }
+
+    // NEW — forgot password, send OTP to reset
+    @PostMapping("/forgot-password/send-otp")
+    public ResponseEntity<String> forgotPasswordSendOtp(@RequestBody Map<String, String> request) {
+        String identifier = request.get("identifier");
+        if (identifier.contains("@")) {
+            return ResponseEntity.ok(authService.sendOtpByEmail(identifier));
+        } else {
+            return ResponseEntity.ok(authService.sendOtpByPhone(identifier));
+        }
+    }
+
+    // NEW — verify OTP then reset password
+    @PostMapping("/forgot-password/reset")
+    public ResponseEntity<String> forgotPasswordReset(@RequestBody Map<String, String> request) {
+        return ResponseEntity.ok(authService.resetPassword(
+                request.get("identifier"),
+                request.get("otp"),
+                request.get("newPassword")
+        ));
+    }
 }
