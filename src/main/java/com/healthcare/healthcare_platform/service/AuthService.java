@@ -36,7 +36,6 @@ public class AuthService {
             user.setOtpCode(otp);
             userRepository.save(user);
         } else {
-            // Auto-create user
             User user = new User();
             user.setName("User");
             user.setEmail(email);
@@ -58,7 +57,6 @@ public class AuthService {
             user.setOtpCode(otp);
             userRepository.save(user);
         } else {
-            // Auto-create user
             User user = new User();
             user.setName("User");
             user.setEmail(phone + "@temp.com");
@@ -72,18 +70,6 @@ public class AuthService {
         return "OTP sent to phone successfully";
     }
 
-    public String verifyOtpByEmail(String email, String otp) {
-        Optional<User> userOpt = userRepository.findByEmail(email);
-        if (userOpt.isEmpty()) return "User not found";
-        User user = userOpt.get();
-        if (otp.equals(user.getOtpCode())) {
-            user.setOtpCode(null);
-            userRepository.save(user);
-            return jwtUtil.generateToken(email);
-        }
-        return "Invalid OTP";
-    }
-
     public String verifyOtpByPhone(String phone, String otp) {
         Optional<User> userOpt = userRepository.findByPhone(phone);
         if (userOpt.isEmpty()) return "User not found";
@@ -92,6 +78,18 @@ public class AuthService {
             user.setOtpCode(null);
             userRepository.save(user);
             return jwtUtil.generateToken(phone);
+        }
+        return "Invalid OTP";
+    }
+
+    public String verifyOtpByEmail(String email, String otp) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) return "User not found";
+        User user = userOpt.get();
+        if (otp.equals(user.getOtpCode())) {
+            user.setOtpCode(null);
+            userRepository.save(user);
+            return jwtUtil.generateToken(email);
         }
         return "Invalid OTP";
     }
