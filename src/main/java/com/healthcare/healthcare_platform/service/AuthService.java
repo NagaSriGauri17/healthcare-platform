@@ -7,10 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
@@ -18,8 +15,6 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
-
-    private final Map<String, String> otpStorage = new HashMap<>();
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public String register(String name, String email, String phone) {
@@ -34,28 +29,73 @@ public class AuthService {
     }
 
     public String sendOtpByEmail(String email) {
-        String otp = generateOtp();
-        otpStorage.put(email, otp);
+        String otp = "123456";
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            user.setOtpCode(otp);
+            userRepository.save(user);
+        } else {
+            // Auto-create user
+            User user = new User();
+            user.setName("User");
+            user.setEmail(email);
+            user.setPhone("");
+            user.setPassword("");
+            user.setRole("PATIENT");
+            user.setOtpCode(otp);
+            userRepository.save(user);
+        }
         System.out.println("OTP for " + email + " is: " + otp);
         return "OTP sent to email successfully";
     }
 
     public String sendOtpByPhone(String phone) {
-        String otp = generateOtp();
-        otpStorage.put(phone, otp);
+        String otp = "123456";
+        Optional<User> userOpt = userRepository.findByPhone(phone);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            user.setOtpCode(otp);
+            userRepository.save(user);
+        } else {
+            // Auto-create user
+            User user = new User();
+            user.setName("User");
+            user.setEmail(phone + "@temp.com");
+            user.setPhone(phone);
+            user.setPassword("");
+            user.setRole("PATIENT");
+            user.setOtpCode(otp);
+            userRepository.save(user);
+        }
         System.out.println("OTP for phone " + phone + " is: " + otp);
         return "OTP sent to phone successfully";
     }
 
     public String verifyOtpByEmail(String email, String otp) {
-        return verifyOtp(email, otp);
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) return "User not found";
+        User user = userOpt.get();
+        if (otp.equals(user.getOtpCode())) {
+            user.setOtpCode(null);
+            userRepository.save(user);
+            return jwtUtil.generateToken(email);
+        }
+        return "Invalid OTP";
     }
 
     public String verifyOtpByPhone(String phone, String otp) {
-        return verifyOtp(phone, otp);
+        Optional<User> userOpt = userRepository.findByPhone(phone);
+        if (userOpt.isEmpty()) return "User not found";
+        User user = userOpt.get();
+        if (otp.equals(user.getOtpCode())) {
+            user.setOtpCode(null);
+            userRepository.save(user);
+            return jwtUtil.generateToken(phone);
+        }
+        return "Invalid OTP";
     }
 
-    // Set password after OTP verified
     public String setPassword(String identifier, String password) {
         if (password == null || password.length() < 8) {
             return "Password must be at least 8 characters";
@@ -65,7 +105,6 @@ public class AuthService {
                 : userRepository.findByPhone(identifier);
 
         if (userOpt.isEmpty()) {
-            // Auto-register if user doesn't exist yet
             User user = new User();
             user.setName("Staff");
             user.setEmail(identifier.contains("@") ? identifier : null);
@@ -82,19 +121,14 @@ public class AuthService {
         return jwtUtil.generateToken(identifier);
     }
 
-    // Login with email/phone + password
     public String login(String identifier, String password) {
         Optional<User> userOpt = identifier.contains("@")
                 ? userRepository.findByEmail(identifier)
                 : userRepository.findByPhone(identifier);
 
-        if (userOpt.isEmpty()) {
-            return "User not found";
-        }
-
+        if (userOpt.isEmpty()) return "User not found";
         User user = userOpt.get();
 
-        // If no password set yet, tell them to sign up first
         if (user.getPassword() == null || user.getPassword().isEmpty()) {
             return "Please complete signup first";
         }
@@ -102,33 +136,24 @@ public class AuthService {
         if (passwordEncoder.matches(password, user.getPassword())) {
             return jwtUtil.generateToken(identifier);
         }
-
         return "Invalid password";
     }
 
-    // Reset password after forgot-password OTP verified
     public String resetPassword(String identifier, String otp, String newPassword) {
-        String storedOtp = otpStorage.get(identifier);
-        if (storedOtp == null || !storedOtp.equals(otp)) {
-            return "Invalid OTP";
-        }
+        Optional<User> userOpt = identifier.contains("@")
+                ? userRepository.findByEmail(identifier)
+                : userRepository.findByPhone(identifier);
+
+        if (userOpt.isEmpty()) return "User not found";
+        User user = userOpt.get();
+
+        if (!otp.equals(user.getOtpCode())) return "Invalid OTP";
         if (newPassword == null || newPassword.length() < 8) {
             return "Password must be at least 8 characters";
         }
-        otpStorage.remove(identifier);
+
+        user.setOtpCode(null);
+        userRepository.save(user);
         return setPassword(identifier, newPassword);
-    }
-
-    private String verifyOtp(String key, String otp) {
-        String storedOtp = otpStorage.get(key);
-        if (storedOtp != null && storedOtp.equals(otp)) {
-            otpStorage.remove(key);
-            return jwtUtil.generateToken(key);
-        }
-        return "Invalid OTP";
-    }
-
-    private String generateOtp() {
-        return "123456";
     }
 }

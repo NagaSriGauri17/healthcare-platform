@@ -29,4 +29,6 @@ public class User {
     private LocalDateTime createdAt;
 
     private String fcmToken;
+
+    private String otpCode;
 }
