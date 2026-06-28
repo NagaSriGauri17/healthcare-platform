@@ -1,13 +1,15 @@
 package com.healthcare.healthcare_platform.service;
 
-import com.healthcare.healthcare_platform.entity.User;
-import com.healthcare.healthcare_platform.repository.UserRepository;
-import com.healthcare.healthcare_platform.util.JwtUtil;
-import lombok.RequiredArgsConstructor;
+import java.util.Optional;
+
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import com.healthcare.healthcare_platform.entity.User;
+import com.healthcare.healthcare_platform.repository.UserRepository;
+import com.healthcare.healthcare_platform.util.JwtUtil;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
