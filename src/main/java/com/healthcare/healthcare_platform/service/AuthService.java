@@ -8,6 +8,9 @@ import org.springframework.stereotype.Service;
 import com.healthcare.healthcare_platform.entity.User;
 import com.healthcare.healthcare_platform.repository.UserRepository;
 import com.healthcare.healthcare_platform.util.JwtUtil;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
 
 import lombok.RequiredArgsConstructor;
 
@@ -51,38 +54,38 @@ public class AuthService {
         return "OTP sent to email successfully";
     }
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Transactional
     public String sendOtpByPhone(String phone) {
         String otp = "123456";
-        Optional<User> userOpt = userRepository.findByPhone(phone);
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            user.setOtpCode(otp);
-            userRepository.save(user);
-        } else {
-            User user = new User();
-            user.setName("User");
-            user.setEmail(phone + "@temp.com");
-            user.setPhone(phone);
-            user.setPassword("");
-            user.setRole("PATIENT");
-            user.setOtpCode(otp);
-            userRepository.save(user);
-        }
+        entityManager.createNativeQuery(
+                        "UPDATE users SET otp_code = :otp WHERE phone = :phone")
+                .setParameter("otp", otp)
+                .setParameter("phone", phone)
+                .executeUpdate();
         System.out.println("OTP for phone " + phone + " is: " + otp);
         return "OTP sent to phone successfully";
     }
 
+    @Transactional
     public String verifyOtpByPhone(String phone, String otp) {
-        Optional<User> userOpt = userRepository.findByPhone(phone);
-        if (userOpt.isEmpty()) return "User not found";
-        User user = userOpt.get();
-        if (otp.equals(user.getOtpCode())) {
-            user.setOtpCode(null);
-            userRepository.save(user);
+        Object result = entityManager.createNativeQuery(
+                        "SELECT otp_code FROM users WHERE phone = :phone")
+                .setParameter("phone", phone)
+                .getSingleResult();
+        if (result != null && otp.equals(result.toString())) {
+            entityManager.createNativeQuery(
+                            "UPDATE users SET otp_code = NULL WHERE phone = :phone")
+                    .setParameter("phone", phone)
+                    .executeUpdate();
             return jwtUtil.generateToken(phone);
         }
         return "Invalid OTP";
     }
+
+
 
     public String verifyOtpByEmail(String email, String otp) {
         Optional<User> userOpt = userRepository.findByEmail(email);
