@@ -65,10 +65,6 @@ public class AuthService {
                 .getSingleResult();
         System.out.println("Stored OTP: " + result + " | Entered OTP: " + otp);
         if (result != null && otp.equals(result.toString())) {
-            entityManager.createNativeQuery(
-                            "UPDATE users SET otp_code = NULL WHERE phone = :phone")
-                    .setParameter("phone", phone)
-                    .executeUpdate();
             return jwtUtil.generateToken(phone);
         }
         return "Invalid OTP";
