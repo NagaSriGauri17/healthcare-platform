@@ -63,8 +63,8 @@ public class AuthService {
                         "SELECT otp_code FROM users WHERE phone = :phone")
                 .setParameter("phone", phone)
                 .getSingleResult();
-        System.out.println("Stored OTP: " + result + " | Entered OTP: " + otp);
-        if (result != null && otp.equals(result.toString())) {
+        System.out.println("Stored OTP: [" + result + "] type: " + (result != null ? result.getClass().getName() : "null") + " | Entered: [" + otp + "]");
+        if (result != null && result.toString().trim().equals(otp.trim())) {
             return jwtUtil.generateToken(phone);
         }
         return "Invalid OTP";
