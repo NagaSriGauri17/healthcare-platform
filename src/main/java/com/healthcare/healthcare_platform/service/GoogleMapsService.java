@@ -60,7 +60,7 @@ public class GoogleMapsService {
                     hospital.put("city", city);
                     hospital.put("latitude", result.geometry.location.lat);
                     hospital.put("longitude", result.geometry.location.lng);
-                    hospital.put("rating", result.rating != null ? result.rating : 0.0);
+                    hospital.put("rating", (double) result.rating);
                     hospital.put("placeId", result.placeId);
                     hospitalList.add(hospital);
                 }
