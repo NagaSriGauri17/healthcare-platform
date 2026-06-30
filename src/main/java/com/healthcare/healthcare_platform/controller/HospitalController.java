@@ -75,7 +75,7 @@ public class HospitalController {
         return ResponseEntity.ok(hospitalService.findNearbyHospitals(lat, lng, radius));
     }
 
-    @GetMapping("/live-search")
+    @GetMapping("/find-by-city")
     public ResponseEntity<List<Map<String, Object>>> liveSearch(
             @RequestParam String city) {
         return ResponseEntity.ok(googleMapsService.searchHospitalsByCity(city));
