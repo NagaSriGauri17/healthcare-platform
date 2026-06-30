@@ -2,6 +2,7 @@ package com.healthcare.healthcare_platform.controller;
 
 import com.healthcare.healthcare_platform.entity.Hospital;
 import com.healthcare.healthcare_platform.service.DoctorService;
+import com.healthcare.healthcare_platform.service.GoogleMapsService;
 import com.healthcare.healthcare_platform.service.HospitalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ public class HospitalController {
 
     private final HospitalService hospitalService;
     private final DoctorService doctorService;
+    private final GoogleMapsService googleMapsService;
 
     @PostMapping("/register")
     public ResponseEntity<Hospital> register(@RequestBody Map<String, Object> request) {
@@ -71,5 +73,11 @@ public class HospitalController {
             @RequestParam Double lng,
             @RequestParam Double radius) {
         return ResponseEntity.ok(hospitalService.findNearbyHospitals(lat, lng, radius));
+    }
+
+    @GetMapping("/live-search")
+    public ResponseEntity<List<Map<String, Object>>> liveSearch(
+            @RequestParam String city) {
+        return ResponseEntity.ok(googleMapsService.searchHospitalsByCity(city));
     }
 }
