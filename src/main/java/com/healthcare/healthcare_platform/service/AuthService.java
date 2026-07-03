@@ -37,15 +37,40 @@ public class AuthService {
     }
 
     public String sendOtpByPhone(String phone) {
-        String otp = "123456";
-        int updated = entityManager.createNativeQuery(
+    String otp = "123456";
+
+    // Check if user with this phone already exists
+    Long count = ((Number) entityManager.createNativeQuery(
+                    "SELECT COUNT(*) FROM users WHERE phone = :phone")
+            .setParameter("phone", phone)
+            .getSingleResult()).longValue();
+
+    if (count == 0) {
+        // Create a new user with placeholder values (phone-only login)
+        entityManager.createNativeQuery(
+                        "INSERT INTO users (name, email, password, phone, role, otp_code, created_at) " +
+                        "VALUES (:name, :email, :password, :phone, :role, :otp, :createdAt)")
+                .setParameter("name", "Patient_" + phone)
+                .setParameter("email", phone + "@placeholder.healthcare.app")
+                .setParameter("password", "PHONE_LOGIN_NO_PASSWORD")
+                .setParameter("phone", phone)
+                .setParameter("role", "PATIENT")
+                .setParameter("otp", otp)
+                .setParameter("createdAt", java.time.LocalDateTime.now())
+                .executeUpdate();
+        System.out.println("Created new user for phone: " + phone);
+    } else {
+        entityManager.createNativeQuery(
                         "UPDATE users SET otp_code = :otp WHERE phone = :phone")
                 .setParameter("otp", otp)
                 .setParameter("phone", phone)
                 .executeUpdate();
-        System.out.println("Updated rows: " + updated + " | OTP for phone " + phone + " is: " + otp);
-        return "OTP sent to phone successfully";
+        System.out.println("Updated OTP for existing phone: " + phone);
     }
+
+    System.out.println("OTP for phone " + phone + " is: " + otp);
+    return "OTP sent to phone successfully";
+}
 
     public String sendOtpByEmail(String email) {
         String otp = "123456";
@@ -59,19 +84,26 @@ public class AuthService {
     }
 
     public String verifyOtpByPhone(String phone, String otp) {
-        Object result = entityManager.createNativeQuery(
-                        "SELECT otp_code FROM users WHERE phone = :phone")
-                .setParameter("phone", phone)
-                .getSingleResult();
-        boolean match = result.toString().trim().equals(otp.trim());
-        System.out.println("Match: " + match + " | Stored: [" + result + "] | Entered: [" + otp + "]");
-        if (match) {
-            String token = jwtUtil.generateToken(phone);
-            System.out.println("Token generated: " + token.substring(0, 20));
-            return token;
-        }
-        return "Invalid OTP";
+    java.util.List<?> results = entityManager.createNativeQuery(
+                    "SELECT otp_code FROM users WHERE phone = :phone")
+            .setParameter("phone", phone)
+            .getResultList();
+
+    if (results.isEmpty()) {
+        return "Phone not found. Please request OTP first.";
     }
+
+    Object result = results.get(0);
+    boolean match = result != null && result.toString().trim().equals(otp.trim());
+    System.out.println("Match: " + match + " | Stored: [" + result + "] | Entered: [" + otp + "]");
+
+    if (match) {
+        String token = jwtUtil.generateToken(phone);
+        System.out.println("Token generated: " + token.substring(0, 20));
+        return token;
+    }
+    return "Invalid OTP";
+}
 
     public String verifyOtpByEmail(String email, String otp) {
         Object result = entityManager.createNativeQuery(
