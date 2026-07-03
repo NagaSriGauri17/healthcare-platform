@@ -75,7 +75,7 @@ public class GoogleMapsService {
                         hospital.put("longitude", location.get("longitude"));
                     }
 
-                    hospital.put("rating", place.getOrDefault("rating", 0.0));
+                    hospital.put("rating", result.rating > 0 ? (double) result.rating : 0.0);
                     hospital.put("placeId", place.getOrDefault("id", ""));
 
                     hospitalList.add(hospital);

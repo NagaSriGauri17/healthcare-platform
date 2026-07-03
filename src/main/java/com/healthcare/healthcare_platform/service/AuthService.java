@@ -37,40 +37,38 @@ public class AuthService {
     }
 
     public String sendOtpByPhone(String phone) {
-    String otp = "123456";
+        String otp = "123456";
 
-    // Check if user with this phone already exists
-    Long count = ((Number) entityManager.createNativeQuery(
-                    "SELECT COUNT(*) FROM users WHERE phone = :phone")
-            .setParameter("phone", phone)
-            .getSingleResult()).longValue();
+        Long count = ((Number) entityManager.createNativeQuery(
+                        "SELECT COUNT(*) FROM users WHERE phone = :phone")
+                .setParameter("phone", phone)
+                .getSingleResult()).longValue();
 
-    if (count == 0) {
-        // Create a new user with placeholder values (phone-only login)
-        entityManager.createNativeQuery(
-                        "INSERT INTO users (name, email, password, phone, role, otp_code, created_at) " +
-                        "VALUES (:name, :email, :password, :phone, :role, :otp, :createdAt)")
-                .setParameter("name", "Patient_" + phone)
-                .setParameter("email", phone + "@placeholder.healthcare.app")
-                .setParameter("password", "PHONE_LOGIN_NO_PASSWORD")
-                .setParameter("phone", phone)
-                .setParameter("role", "PATIENT")
-                .setParameter("otp", otp)
-                .setParameter("createdAt", java.time.LocalDateTime.now())
-                .executeUpdate();
-        System.out.println("Created new user for phone: " + phone);
-    } else {
-        entityManager.createNativeQuery(
-                        "UPDATE users SET otp_code = :otp WHERE phone = :phone")
-                .setParameter("otp", otp)
-                .setParameter("phone", phone)
-                .executeUpdate();
-        System.out.println("Updated OTP for existing phone: " + phone);
+        if (count == 0) {
+            entityManager.createNativeQuery(
+                            "INSERT INTO users (name, email, password, phone, role, otp_code, created_at) " +
+                                    "VALUES (:name, :email, :password, :phone, :role, :otp, :createdAt)")
+                    .setParameter("name", "Patient_" + phone)
+                    .setParameter("email", phone + "@placeholder.healthcare.app")
+                    .setParameter("password", "PHONE_LOGIN_NO_PASSWORD")
+                    .setParameter("phone", phone)
+                    .setParameter("role", "PATIENT")
+                    .setParameter("otp", otp)
+                    .setParameter("createdAt", java.time.LocalDateTime.now())
+                    .executeUpdate();
+            System.out.println("Created new user for phone: " + phone);
+        } else {
+            entityManager.createNativeQuery(
+                            "UPDATE users SET otp_code = :otp WHERE phone = :phone")
+                    .setParameter("otp", otp)
+                    .setParameter("phone", phone)
+                    .executeUpdate();
+            System.out.println("Updated OTP for existing phone: " + phone);
+        }
+
+        System.out.println("OTP for phone " + phone + " is: " + otp);
+        return "OTP sent to phone successfully";
     }
-
-    System.out.println("OTP for phone " + phone + " is: " + otp);
-    return "OTP sent to phone successfully";
-}
 
     public String sendOtpByEmail(String email) {
         String otp = "123456";
@@ -84,26 +82,26 @@ public class AuthService {
     }
 
     public String verifyOtpByPhone(String phone, String otp) {
-    java.util.List<?> results = entityManager.createNativeQuery(
-                    "SELECT otp_code FROM users WHERE phone = :phone")
-            .setParameter("phone", phone)
-            .getResultList();
+        java.util.List<?> results = entityManager.createNativeQuery(
+                        "SELECT otp_code FROM users WHERE phone = :phone")
+                .setParameter("phone", phone)
+                .getResultList();
 
-    if (results.isEmpty()) {
-        return "Phone not found. Please request OTP first.";
+        if (results.isEmpty()) {
+            return "Phone not found. Please request OTP first.";
+        }
+
+        Object result = results.get(0);
+        boolean match = result != null && result.toString().trim().equals(otp.trim());
+        System.out.println("Match: " + match + " | Stored: [" + result + "] | Entered: [" + otp + "]");
+
+        if (match) {
+            String token = jwtUtil.generateToken(phone);
+            System.out.println("Token generated: " + token.substring(0, 20));
+            return token;
+        }
+        return "Invalid OTP";
     }
-
-    Object result = results.get(0);
-    boolean match = result != null && result.toString().trim().equals(otp.trim());
-    System.out.println("Match: " + match + " | Stored: [" + result + "] | Entered: [" + otp + "]");
-
-    if (match) {
-        String token = jwtUtil.generateToken(phone);
-        System.out.println("Token generated: " + token.substring(0, 20));
-        return token;
-    }
-    return "Invalid OTP";
-}
 
     public String verifyOtpByEmail(String email, String otp) {
         Object result = entityManager.createNativeQuery(
@@ -121,7 +119,7 @@ public class AuthService {
         return "Invalid OTP";
     }
 
-    public String setPassword(String identifier, String password) {
+    public String setPassword(String identifier, String password, Long hospitalId) {
         if (password == null || password.length() < 8) {
             return "Password must be at least 8 characters";
         }
@@ -136,14 +134,16 @@ public class AuthService {
             user.setPhone(identifier.contains("@") ? null : identifier);
             user.setPassword(passwordEncoder.encode(password));
             user.setRole("HOSPITAL_ADMIN");
+            user.setHospitalId(hospitalId);
             userRepository.save(user);
-            return jwtUtil.generateToken(identifier);
+            return jwtUtil.generateToken(identifier, hospitalId, "HOSPITAL_ADMIN");
         }
 
         User user = userOpt.get();
         user.setPassword(passwordEncoder.encode(password));
+        if (hospitalId != null) user.setHospitalId(hospitalId);
         userRepository.save(user);
-        return jwtUtil.generateToken(identifier);
+        return jwtUtil.generateToken(identifier, user.getHospitalId(), user.getRole());
     }
 
     public String login(String identifier, String password) {
@@ -159,7 +159,7 @@ public class AuthService {
         }
 
         if (passwordEncoder.matches(password, user.getPassword())) {
-            return jwtUtil.generateToken(identifier);
+            return jwtUtil.generateToken(identifier, user.getHospitalId(), user.getRole());
         }
         return "Invalid password";
     }
@@ -179,6 +179,20 @@ public class AuthService {
 
         user.setOtpCode(null);
         userRepository.save(user);
-        return setPassword(identifier, newPassword);
+        return setPassword(identifier, newPassword, user.getHospitalId());
+    }
+
+    public java.util.Map<String, Object> getCurrentUser(String identifier) {
+        Optional<User> userOpt = identifier.contains("@")
+                ? userRepository.findByEmail(identifier)
+                : userRepository.findByPhone(identifier);
+        if (userOpt.isEmpty()) return java.util.Map.of("error", "User not found");
+        User user = userOpt.get();
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        result.put("id", user.getId());
+        result.put("name", user.getName());
+        result.put("role", user.getRole());
+        result.put("hospitalId", user.getHospitalId());
+        return result;
     }
 }

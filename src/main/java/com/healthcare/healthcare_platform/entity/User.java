@@ -31,4 +31,6 @@ public class User {
     private String fcmToken;
 
     private String otpCode;
+
+    private Long hospitalId;
 }

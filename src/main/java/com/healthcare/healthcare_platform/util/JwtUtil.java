@@ -17,13 +17,22 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(SECRET.getBytes());
     }
 
-    public String generateToken(String email) {
-        return Jwts.builder()
-                .setSubject(email)
+    // Original method — kept for patient login (no hospital context needed)
+    public String generateToken(String identifier) {
+        return generateToken(identifier, null, "PATIENT");
+    }
+
+    // New — for staff logins, embeds hospitalId + role
+    public String generateToken(String identifier, Long hospitalId, String role) {
+        JwtBuilder builder = Jwts.builder()
+                .setSubject(identifier)
+                .claim("role", role)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(getKey(), SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION));
+        if (hospitalId != null) {
+            builder.claim("hospitalId", hospitalId);
+        }
+        return builder.signWith(getKey(), SignatureAlgorithm.HS256).compact();
     }
 
     public String extractEmail(String token) {
@@ -33,6 +42,25 @@ public class JwtUtil {
                 .parseClaimsJws(token)
                 .getBody()
                 .getSubject();
+    }
+
+    public Long extractHospitalId(String token) {
+        Object val = Jwts.parserBuilder()
+                .setSigningKey(getKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("hospitalId");
+        return val != null ? Long.valueOf(val.toString()) : null;
+    }
+
+    public String extractRole(String token) {
+        return (String) Jwts.parserBuilder()
+                .setSigningKey(getKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("role");
     }
 
     public boolean validateToken(String token) {
