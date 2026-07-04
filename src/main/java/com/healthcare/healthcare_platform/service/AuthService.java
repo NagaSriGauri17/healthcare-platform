@@ -72,12 +72,35 @@ public class AuthService {
 
     public String sendOtpByEmail(String email) {
         String otp = "123456";
-        int updated = entityManager.createNativeQuery(
-                        "UPDATE users SET otp_code = :otp WHERE email = :email")
-                .setParameter("otp", otp)
+
+        Long count = ((Number) entityManager.createNativeQuery(
+                        "SELECT COUNT(*) FROM users WHERE email = :email")
                 .setParameter("email", email)
-                .executeUpdate();
-        System.out.println("Updated rows: " + updated + " | OTP for email " + email + " is: " + otp);
+                .getSingleResult()).longValue();
+
+        if (count == 0) {
+            entityManager.createNativeQuery(
+                            "INSERT INTO users (name, email, password, phone, role, otp_code, created_at) " +
+                                    "VALUES (:name, :email, :password, :phone, :role, :otp, :createdAt)")
+                    .setParameter("name", "Staff_" + email.split("@")[0])
+                    .setParameter("email", email)
+                    .setParameter("password", "")
+                    .setParameter("phone", null)
+                    .setParameter("role", "HOSPITAL_ADMIN")
+                    .setParameter("otp", otp)
+                    .setParameter("createdAt", java.time.LocalDateTime.now())
+                    .executeUpdate();
+            System.out.println("Created new user for email: " + email);
+        } else {
+            entityManager.createNativeQuery(
+                            "UPDATE users SET otp_code = :otp WHERE email = :email")
+                    .setParameter("otp", otp)
+                    .setParameter("email", email)
+                    .executeUpdate();
+            System.out.println("Updated OTP for existing email: " + email);
+        }
+
+        System.out.println("OTP for email " + email + " is: " + otp);
         return "OTP sent to email successfully";
     }
 
@@ -104,12 +127,20 @@ public class AuthService {
     }
 
     public String verifyOtpByEmail(String email, String otp) {
-        Object result = entityManager.createNativeQuery(
+        java.util.List<?> results = entityManager.createNativeQuery(
                         "SELECT otp_code FROM users WHERE email = :email")
                 .setParameter("email", email)
-                .getSingleResult();
-        System.out.println("Stored OTP: " + result + " | Entered OTP: " + otp);
-        if (result != null && otp.equals(result.toString())) {
+                .getResultList();
+
+        if (results.isEmpty()) {
+            return "Email not found. Please request OTP first.";
+        }
+
+        Object result = results.get(0);
+        boolean match = result != null && result.toString().trim().equals(otp.trim());
+        System.out.println("Match: " + match + " | Stored: [" + result + "] | Entered: [" + otp + "]");
+
+        if (match) {
             entityManager.createNativeQuery(
                             "UPDATE users SET otp_code = NULL WHERE email = :email")
                     .setParameter("email", email)
