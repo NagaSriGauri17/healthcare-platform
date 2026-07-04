@@ -1,13 +1,19 @@
 package com.healthcare.healthcare_platform.controller;
 
+import com.healthcare.healthcare_platform.entity.Appointment;
+import com.healthcare.healthcare_platform.entity.Doctor;
 import com.healthcare.healthcare_platform.entity.Hospital;
+import com.healthcare.healthcare_platform.service.AppointmentService;
 import com.healthcare.healthcare_platform.service.DoctorService;
 import com.healthcare.healthcare_platform.service.GoogleMapsService;
 import com.healthcare.healthcare_platform.service.HospitalService;
+import com.healthcare.healthcare_platform.service.QueueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +25,8 @@ public class HospitalController {
     private final HospitalService hospitalService;
     private final DoctorService doctorService;
     private final GoogleMapsService googleMapsService;
+    private final AppointmentService appointmentService;
+    private final QueueService queueService;
 
     @PostMapping("/register")
     public ResponseEntity<Hospital> register(@RequestBody Map<String, Object> request) {
@@ -80,4 +88,35 @@ public class HospitalController {
             @RequestParam String city) {
         return ResponseEntity.ok(googleMapsService.searchHospitalsByCity(city));
     }
-}// rebuild trigger Tue Jun 30 10:44:09 IST 2026
+
+    // Hospital-wide: today's appointments across ALL doctors in this hospital
+    @GetMapping("/{hospitalId}/appointments/today")
+    public ResponseEntity<List<Appointment>> getHospitalAppointmentsToday(@PathVariable Long hospitalId) {
+        List<Doctor> doctors = doctorService.getDoctorsByHospital(hospitalId);
+        List<Appointment> allAppointments = new ArrayList<>();
+        for (Doctor doctor : doctors) {
+            allAppointments.addAll(appointmentService.getDoctorAppointments(doctor.getId()));
+        }
+        return ResponseEntity.ok(allAppointments);
+    }
+
+    // Hospital-wide: queue summary across ALL doctors in this hospital
+    @GetMapping("/{hospitalId}/queue/summary")
+    public ResponseEntity<Map<String, Object>> getHospitalQueueSummary(@PathVariable Long hospitalId) {
+        List<Doctor> doctors = doctorService.getDoctorsByHospital(hospitalId);
+        int totalCurrentToken = 0;
+        int totalWaiting = 0;
+        for (Doctor doctor : doctors) {
+            Map<String, Object> status = queueService.getQueueStatus(doctor.getId());
+            Object current = status.get("currentToken");
+            Object waiting = status.get("waitingCount");
+            if (current != null) totalCurrentToken += Integer.parseInt(current.toString());
+            if (waiting != null) totalWaiting += Integer.parseInt(waiting.toString());
+        }
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("currentToken", totalCurrentToken);
+        summary.put("waitingCount", totalWaiting);
+        summary.put("doctorCount", doctors.size());
+        return ResponseEntity.ok(summary);
+    }
+}
