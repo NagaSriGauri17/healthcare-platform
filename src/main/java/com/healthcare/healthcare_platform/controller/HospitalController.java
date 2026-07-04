@@ -120,8 +120,17 @@ public class HospitalController {
             summary.put("doctorCount", doctors.size());
             return ResponseEntity.ok(summary);
         } catch (Exception e) {
+            Throwable rootCause = e;
+            StringBuilder causeChain = new StringBuilder();
+            while (rootCause != null) {
+                causeChain.append(rootCause.getClass().getName())
+                        .append(": ")
+                        .append(rootCause.getMessage())
+                        .append(" | ");
+                rootCause = rootCause.getCause();
+            }
             summary.put("error", e.toString());
-            summary.put("stackTrace", java.util.Arrays.toString(e.getStackTrace()));
+            summary.put("causeChain", causeChain.toString());
             return ResponseEntity.status(500).body(summary);
         }
     }
