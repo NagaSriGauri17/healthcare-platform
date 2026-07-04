@@ -125,3 +125,4 @@ public class HospitalController {
             return ResponseEntity.status(500).body(summary);
         }
     }
+}
