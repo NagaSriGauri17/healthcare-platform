@@ -103,20 +103,25 @@ public class HospitalController {
     // Hospital-wide: queue summary across ALL doctors in this hospital
     @GetMapping("/{hospitalId}/queue/summary")
     public ResponseEntity<Map<String, Object>> getHospitalQueueSummary(@PathVariable Long hospitalId) {
-        List<Doctor> doctors = doctorService.getDoctorsByHospital(hospitalId);
-        int totalCurrentToken = 0;
-        int totalWaiting = 0;
-        for (Doctor doctor : doctors) {
-            Map<String, Object> status = queueService.getQueueStatus(doctor.getId());
-            Object current = status.get("currentToken");
-            Object waiting = status.get("waitingCount");
-            if (current != null) totalCurrentToken += Integer.parseInt(current.toString());
-            if (waiting != null) totalWaiting += Integer.parseInt(waiting.toString());
-        }
         Map<String, Object> summary = new HashMap<>();
-        summary.put("currentToken", totalCurrentToken);
-        summary.put("waitingCount", totalWaiting);
-        summary.put("doctorCount", doctors.size());
-        return ResponseEntity.ok(summary);
+        try {
+            List<Doctor> doctors = doctorService.getDoctorsByHospital(hospitalId);
+            int totalCurrentToken = 0;
+            int totalWaiting = 0;
+            for (Doctor doctor : doctors) {
+                Map<String, Object> status = queueService.getQueueStatus(doctor.getId());
+                Object current = status.get("currentToken");
+                Object waiting = status.get("waitingCount");
+                if (current != null) totalCurrentToken += Integer.parseInt(current.toString());
+                if (waiting != null) totalWaiting += Integer.parseInt(waiting.toString());
+            }
+            summary.put("currentToken", totalCurrentToken);
+            summary.put("waitingCount", totalWaiting);
+            summary.put("doctorCount", doctors.size());
+            return ResponseEntity.ok(summary);
+        } catch (Exception e) {
+            summary.put("error", e.toString());
+            summary.put("stackTrace", java.util.Arrays.toString(e.getStackTrace()));
+            return ResponseEntity.status(500).body(summary);
+        }
     }
-}
