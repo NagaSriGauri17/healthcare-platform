@@ -100,6 +100,15 @@ public class HospitalController {
         return ResponseEntity.ok(allAppointments);
     }
 
+    @GetMapping("/debug/env")
+    public ResponseEntity<Map<String, Object>> debugEnv() {
+        Map<String, Object> debug = new HashMap<>();
+        debug.put("REDIS_URL_raw", System.getenv("REDIS_URL"));
+        debug.put("SPRING_DATASOURCE_URL_raw", System.getenv("SPRING_DATASOURCE_URL"));
+        debug.put("AWS_ACCESS_KEY_raw", System.getenv("AWS_ACCESS_KEY"));
+        return ResponseEntity.ok(debug);
+    }
+
     // Hospital-wide: queue summary across ALL doctors in this hospital
     @GetMapping("/{hospitalId}/queue/summary")
     public ResponseEntity<Map<String, Object>> getHospitalQueueSummary(@PathVariable Long hospitalId) {
