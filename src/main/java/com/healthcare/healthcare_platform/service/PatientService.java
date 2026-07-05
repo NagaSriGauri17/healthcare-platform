@@ -60,6 +60,13 @@ public class PatientService {
         return null;
     }
 
+    public List<User> searchPatients(String query) {
+        if (query == null || query.trim().length() < 2) {
+            return List.of();
+        }
+        return userRepository.findByNameContainingIgnoreCase(query.trim());
+    }
+
     public String deleteFamilyMember(Long memberId) {
         familyMemberRepository.deleteById(memberId);
         return "Family member removed successfully";

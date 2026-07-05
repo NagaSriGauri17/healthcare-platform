@@ -65,6 +65,11 @@ public class QueueController {
         return ResponseEntity.ok(queueService.holdToken(doctorId, tokenNumber));
     }
 
+    @GetMapping("/board/{doctorId}")
+    public ResponseEntity<Map<String, Object>> getQueueBoard(@PathVariable Long doctorId) {
+        return ResponseEntity.ok(queueService.getQueueBoard(doctorId));
+    }
+
     @PostMapping("/resume/{doctorId}/{tokenNumber}")
     public ResponseEntity<Map<String, Object>> resumeToken(
             @PathVariable Long doctorId,

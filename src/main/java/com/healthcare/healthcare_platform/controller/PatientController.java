@@ -46,6 +46,11 @@ public class PatientController {
         return ResponseEntity.ok(member);
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<User>> searchPatients(@RequestParam String query) {
+        return ResponseEntity.ok(patientService.searchPatients(query));
+    }
+
     @GetMapping("/family/list/{userId}")
     public ResponseEntity<List<FamilyMember>> getFamilyMembers(@PathVariable Long userId) {
         return ResponseEntity.ok(patientService.getFamilyMembers(userId));

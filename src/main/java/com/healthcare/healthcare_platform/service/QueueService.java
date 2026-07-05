@@ -13,7 +13,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.util.ArrayList;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -160,6 +160,41 @@ public class QueueService {
         status.put("estimatedWaitMinutes", waitingCount * 15);
         status.put("waitingTokens", waitingList);
         return status;
+    }
+
+    public Map<String, Object> getQueueBoard(Long doctorId) {
+        LocalDate today = LocalDate.now();
+        List<QueueToken> allTokens = queueTokenRepository.findAll();
+
+        List<Map<String, Object>> inProgress = new ArrayList<>();
+        List<Map<String, Object>> waiting = new ArrayList<>();
+        List<Map<String, Object>> completed = new ArrayList<>();
+
+        for (QueueToken t : allTokens) {
+            if (t.getDoctorId() == null || !t.getDoctorId().equals(doctorId)) continue;
+            if (t.getCheckedInAt() == null || !t.getCheckedInAt().toLocalDate().equals(today)) continue;
+
+            Map<String, Object> info = new HashMap<>();
+            info.put("tokenNumber", t.getTokenNumber());
+            info.put("status", t.getStatus());
+            if (t.getAppointment() != null) {
+                info.put("appointmentId", t.getAppointment().getId());
+                if (t.getAppointment().getUser() != null) {
+                    info.put("patientName", t.getAppointment().getUser().getName());
+                    info.put("patientPhone", t.getAppointment().getUser().getPhone());
+                }
+            }
+
+            if ("IN_PROGRESS".equals(t.getStatus())) inProgress.add(info);
+            else if ("WAITING".equals(t.getStatus())) waiting.add(info);
+            else if ("COMPLETED".equals(t.getStatus())) completed.add(info);
+        }
+
+        Map<String, Object> board = new HashMap<>();
+        board.put("inProgress", inProgress);
+        board.put("waiting", waiting);
+        board.put("completed", completed);
+        return board;
     }
 
     // ─── ADVANCE QUEUE — STAFF CLICKS "NEXT" ───────────────────────────────────
