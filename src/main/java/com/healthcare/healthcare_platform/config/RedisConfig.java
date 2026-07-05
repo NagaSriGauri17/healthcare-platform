@@ -1,6 +1,5 @@
 package com.healthcare.healthcare_platform.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -16,13 +15,16 @@ import java.net.URI;
 @Configuration
 public class RedisConfig {
 
-    @Value("${spring.data.redis.url:redis://localhost:6379}")
-    private String redisUrl;
-
     @Bean
     @Primary
     public RedisConnectionFactory redisConnectionFactory() {
+        String redisUrl = System.getenv("REDIS_URL");
+        if (redisUrl == null || redisUrl.isEmpty()) {
+            redisUrl = "redis://localhost:6379";
+        }
+
         System.out.println("=== RedisConfig: Building connection factory with URL: " + redisUrl + " ===");
+
         try {
             URI uri = new URI(redisUrl);
             System.out.println("=== Parsed host: " + uri.getHost() + ", port: " + uri.getPort() + " ===");
