@@ -17,7 +17,6 @@ public class LabTestService {
 
     private final LabTestRepository labTestRepository;
 
-    // Hardcoded test catalogue — in production this comes from DB
     public List<Map<String, Object>> getAvailableTests() {
         List<Map<String, Object>> tests = new ArrayList<>();
 
@@ -48,7 +47,8 @@ public class LabTestService {
     }
 
     public LabTest bookTest(Long patientId, String testCode,
-                            String testName, String centerName, Double price) {
+                            String testName, String centerName, Double price,
+                            String paymentMethod) {
         LabTest labTest = new LabTest();
         labTest.setPatientId(patientId);
         labTest.setTestCode(testCode);
@@ -56,7 +56,8 @@ public class LabTestService {
         labTest.setCenterName(centerName);
         labTest.setPrice(price);
         labTest.setStatus("BOOKED");
-        labTest.setPaymentStatus("PAID"); // simplified — real flow uses Razorpay
+        labTest.setPaymentStatus("PAID"); // simplified — real gateway integration comes later
+        labTest.setPaymentMethod(paymentMethod);
         labTest.setOrderId("LAB_" + System.currentTimeMillis());
         labTest.setBookedAt(LocalDateTime.now());
 

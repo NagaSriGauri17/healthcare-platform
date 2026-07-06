@@ -24,6 +24,7 @@ public class LabTest {
     private String status;
     private String orderId;
     private String paymentStatus;
+    private String paymentMethod;
     private String reportUrl;
     private LocalDateTime bookedAt;
     private LocalDateTime reportUploadedAt;

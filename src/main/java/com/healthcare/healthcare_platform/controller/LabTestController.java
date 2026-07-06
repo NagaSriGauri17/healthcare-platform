@@ -28,7 +28,8 @@ public class LabTestController {
                 (String) request.get("testCode"),
                 (String) request.get("testName"),
                 (String) request.get("centerName"),
-                Double.valueOf(request.get("price").toString())
+                Double.valueOf(request.get("price").toString()),
+                (String) request.get("paymentMethod")
         );
         return ResponseEntity.ok(test);
     }
