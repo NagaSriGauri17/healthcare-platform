@@ -379,4 +379,25 @@ public class QueueService {
                     }
                 });
     }
+    public List<Map<String, Object>> getPendingCheckins(Long doctorId) {
+        LocalDate today = LocalDate.now();
+        List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
+        List<Map<String, Object>> pending = new ArrayList<>();
+
+        for (Appointment apt : appointments) {
+            boolean isToday = apt.getSlot() != null && apt.getSlot().getDate() != null
+                    && apt.getSlot().getDate().equals(today);
+            boolean notYetCheckedIn = "CONFIRMED".equals(apt.getStatus());
+
+            if (isToday && notYetCheckedIn) {
+                Map<String, Object> info = new HashMap<>();
+                info.put("appointmentId", apt.getId());
+                info.put("patientName", apt.getUser() != null ? apt.getUser().getName() : "Patient");
+                info.put("patientPhone", apt.getUser() != null ? apt.getUser().getPhone() : "");
+                info.put("slotTime", apt.getSlot() != null ? apt.getSlot().getStartTime() : "");
+                pending.add(info);
+            }
+        }
+        return pending;
+    }
 }

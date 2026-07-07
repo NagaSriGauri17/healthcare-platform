@@ -117,15 +117,21 @@ public class HospitalController {
             List<Doctor> doctors = doctorService.getDoctorsByHospital(hospitalId);
             int totalCurrentToken = 0;
             int totalWaiting = 0;
+            int totalCompleted = 0;
             for (Doctor doctor : doctors) {
                 Map<String, Object> status = queueService.getQueueStatus(doctor.getId());
                 Object current = status.get("currentToken");
                 Object waiting = status.get("waitingCount");
                 if (current != null) totalCurrentToken += Integer.parseInt(current.toString());
                 if (waiting != null) totalWaiting += Integer.parseInt(waiting.toString());
+
+                Map<String, Object> board = queueService.getQueueBoard(doctor.getId());
+                List<?> completedList = (List<?>) board.get("completed");
+                if (completedList != null) totalCompleted += completedList.size();
             }
             summary.put("currentToken", totalCurrentToken);
             summary.put("waitingCount", totalWaiting);
+            summary.put("completedCount", totalCompleted);
             summary.put("doctorCount", doctors.size());
             return ResponseEntity.ok(summary);
         } catch (Exception e) {

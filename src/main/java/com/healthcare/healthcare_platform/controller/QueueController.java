@@ -5,7 +5,7 @@ import com.healthcare.healthcare_platform.service.QueueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -75,5 +75,9 @@ public class QueueController {
             @PathVariable Long doctorId,
             @PathVariable Integer tokenNumber) {
         return ResponseEntity.ok(queueService.resumeToken(doctorId, tokenNumber));
+    }
+    @GetMapping("/pending-checkins/{doctorId}")
+    public ResponseEntity<List<Map<String, Object>>> getPendingCheckins(@PathVariable Long doctorId) {
+        return ResponseEntity.ok(queueService.getPendingCheckins(doctorId));
     }
 }
