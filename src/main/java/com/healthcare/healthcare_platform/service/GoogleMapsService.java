@@ -42,30 +42,40 @@ public class GoogleMapsService {
 
     public List<Map<String, Object>> searchHospitalsByCity(String city) {
         List<Map<String, Object>> hospitalList = new ArrayList<>();
+        String pageToken = null;
+        int pagesFetched = 0;
+        int maxPages = 3; // up to 60 results (20 per page)
+
         try {
-            String url = "https://places.googleapis.com/v1/places:searchText";
+            while (pagesFetched < maxPages) {
+                String url = "https://places.googleapis.com/v1/places:searchText";
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("X-Goog-Api-Key", apiKey);
-            headers.set("X-Goog-FieldMask",
-                    "places.displayName,places.formattedAddress,places.location,places.rating,places.id");
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.set("X-Goog-Api-Key", apiKey);
+                headers.set("X-Goog-FieldMask",
+                        "places.displayName,places.formattedAddress,places.location,places.rating,places.id,nextPageToken");
 
-            Map<String, Object> body = new HashMap<>();
-            body.put("textQuery", "hospitals in " + city);
+                Map<String, Object> body = new HashMap<>();
+                body.put("textQuery", "hospitals in " + city);
+                body.put("pageSize", 20);
+                if (pageToken != null) {
+                    body.put("pageToken", pageToken);
+                }
 
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+                HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+                Map<String, Object> response = restTemplate.postForObject(url, request, Map.class);
 
-            Map<String, Object> response = restTemplate.postForObject(url, request, Map.class);
+                if (response == null || !response.containsKey("places")) {
+                    break;
+                }
 
-            if (response != null && response.containsKey("places")) {
                 List<Map<String, Object>> places = (List<Map<String, Object>>) response.get("places");
                 for (Map<String, Object> place : places) {
                     Map<String, Object> hospital = new HashMap<>();
 
                     Map<String, Object> displayName = (Map<String, Object>) place.get("displayName");
                     hospital.put("name", displayName != null ? displayName.get("text") : "Unknown");
-
                     hospital.put("address", place.getOrDefault("formattedAddress", ""));
                     hospital.put("city", city);
 
@@ -80,6 +90,17 @@ public class GoogleMapsService {
 
                     hospitalList.add(hospital);
                 }
+
+                pagesFetched++;
+
+                Object nextToken = response.get("nextPageToken");
+                if (nextToken == null || places.isEmpty()) {
+                    break; // no more pages
+                }
+                pageToken = nextToken.toString();
+
+                // Google requires a short delay before a pageToken becomes valid
+                Thread.sleep(2000);
             }
         } catch (Exception e) {
             System.out.println("Places search error: " + e.getMessage());
