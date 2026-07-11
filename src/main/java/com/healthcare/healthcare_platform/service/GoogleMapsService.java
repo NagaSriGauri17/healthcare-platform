@@ -92,6 +92,7 @@ public class GoogleMapsService {
                 }
 
                 pagesFetched++;
+                System.out.println("=== Page " + pagesFetched + ": got " + places.size() + " places, response keys: " + response.keySet() + " ===");
 
                 Object nextToken = response.get("nextPageToken");
                 if (nextToken == null || places.isEmpty()) {
