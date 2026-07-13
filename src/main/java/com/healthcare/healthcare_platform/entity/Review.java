@@ -17,11 +17,14 @@ public class Review {
     private Long id;
 
     private Long patientId;
+    private String patientName;
     private Long doctorId;
+    private Long hospitalId;
     private Long appointmentId;
 
     private Integer rating;
     private String comment;
+    private String type; // "DOCTOR" or "HOSPITAL"
 
     private LocalDateTime createdAt;
 }
