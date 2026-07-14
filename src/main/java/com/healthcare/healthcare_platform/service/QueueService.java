@@ -205,9 +205,10 @@ public class QueueService {
         String redisKey = "queue:doctor:" + doctorId + ":" + today;
 
         // Remove the first token from the waiting list (the one just finished)
+        // Remove the first token from the waiting list (the one just finished)
         Object finishedToken = redisTemplate.opsForList().leftPop(redisKey + ":waiting");
 
-        // Mark that token as COMPLETED in PostgreSQL
+        // Mark that token as COMPLETED in PostgreSQL, and complete its appointment too
         if (finishedToken != null) {
             int tokenNum = Integer.parseInt(finishedToken.toString());
             queueTokenRepository
@@ -216,9 +217,14 @@ public class QueueService {
                         qt.setStatus("COMPLETED");
                         qt.setCompletedAt(LocalDateTime.now());
                         queueTokenRepository.save(qt);
+
+                        if (qt.getAppointment() != null) {
+                            Appointment apt = qt.getAppointment();
+                            apt.setStatus("COMPLETED");
+                            appointmentRepository.save(apt);
+                        }
                     });
         }
-
         // Get next token in line
         List<Object> remainingList = redisTemplate.opsForList().range(redisKey + ":waiting", 0, -1);
         Object nextTokenObj = remainingList != null && !remainingList.isEmpty() ? remainingList.get(0) : null;
