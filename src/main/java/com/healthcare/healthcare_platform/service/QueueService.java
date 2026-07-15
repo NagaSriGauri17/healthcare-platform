@@ -70,7 +70,6 @@ public class QueueService {
         appointment.setType("WALK_IN");
         Appointment saved = appointmentRepository.save(appointment);
 
-        // Broadcast slot update to all patients viewing this doctor's slots
         Map<String, Object> slotUpdate = new HashMap<>();
         slotUpdate.put("slotId", slotId);
         slotUpdate.put("status", "BOOKED");
@@ -80,11 +79,10 @@ public class QueueService {
         return saved;
     }
 
-    // ─── CHECK-IN — THIS IS WHERE THE TOKEN IS BORN ────────────────────────────
+    // ─── CHECK-IN — NOW BECOMES "CURRENT" IMMEDIATELY IF NO ONE IS BEING SEEN ──
 
     @Transactional
     public Map<String, Object> checkIn(Long appointmentId) {
-        // 1. Find the appointment
         Appointment appointment = appointmentRepository.findById(appointmentId)
                 .orElseThrow(() -> new RuntimeException("Appointment not found"));
 
@@ -92,46 +90,48 @@ public class QueueService {
         String today = LocalDate.now().toString();
         String redisKey = "queue:doctor:" + doctorId + ":" + today;
 
-        // Prevent double check-in
         if ("CHECKED_IN".equals(appointment.getStatus())) {
             throw new RuntimeException("Patient already checked in");
         }
 
-        // 2. Assign the next token number from Redis
         Long tokenNumber = redisTemplate.opsForValue().increment(redisKey + ":maxToken");
         if (tokenNumber == null) tokenNumber = 1L;
 
-        // 3. Add token to the waiting list in Redis
-        redisTemplate.opsForList().rightPush(redisKey + ":waiting", tokenNumber.toString());
-
-        // 4. Save QueueToken row in PostgreSQL (permanent record)
         QueueToken token = new QueueToken();
         token.setAppointment(appointment);
         token.setDoctorId(doctorId);
         token.setTokenNumber(tokenNumber.intValue());
-        token.setStatus("WAITING");
         token.setCheckedInAt(LocalDateTime.now());
+
+        Object currentTokenObj = redisTemplate.opsForValue().get(redisKey + ":current");
+        int patientsAhead;
+
+        if (currentTokenObj == null) {
+            // No one is currently being seen — this patient becomes current right away
+            redisTemplate.opsForValue().set(redisKey + ":current", tokenNumber.toString());
+            token.setStatus("IN_PROGRESS");
+            patientsAhead = 0;
+        } else {
+            redisTemplate.opsForList().rightPush(redisKey + ":waiting", tokenNumber.toString());
+            token.setStatus("WAITING");
+            List<Object> waitingList = redisTemplate.opsForList().range(redisKey + ":waiting", 0, -1);
+            patientsAhead = (waitingList != null ? waitingList.size() : 1) - 1;
+        }
+
         queueTokenRepository.save(token);
 
-        // 5. Update appointment status to CHECKED_IN
         appointment.setStatus("CHECKED_IN");
         appointmentRepository.save(appointment);
 
-        // 6. Calculate queue position
-        List<Object> waitingList = redisTemplate.opsForList().range(redisKey + ":waiting", 0, -1);
-        int position = waitingList != null ? waitingList.size() : 1;
-        int patientsAhead = position - 1;
         int estimatedMinutes = patientsAhead * 15;
 
-        // 7. Broadcast queue update to ALL patients watching this doctor
         Map<String, Object> queueUpdate = new HashMap<>();
         queueUpdate.put("event", "NEW_CHECKIN");
         queueUpdate.put("tokenNumber", tokenNumber);
-        queueUpdate.put("totalWaiting", position);
+        queueUpdate.put("patientsAhead", patientsAhead);
         queueUpdate.put("estimatedWaitMinutes", estimatedMinutes);
         messagingTemplate.convertAndSend("/topic/queue/" + doctorId, queueUpdate);
 
-        // 8. Return response to the staff who clicked check-in
         Map<String, Object> response = new HashMap<>();
         response.put("tokenNumber", tokenNumber);
         response.put("patientsAhead", patientsAhead);
@@ -145,7 +145,7 @@ public class QueueService {
 
     public Map<String, Object> getQueueStatus(Long doctorId) {
         String today = LocalDate.now().toString();
-        String redisKey = "queue:doctor:" + doctorId + ":" + today;  // ADD :today here
+        String redisKey = "queue:doctor:" + doctorId + ":" + today;
 
         Object currentTokenObj = redisTemplate.opsForValue().get(redisKey + ":current");
         List<Object> waitingList = redisTemplate.opsForList().range(redisKey + ":waiting", 0, -1);
@@ -197,20 +197,16 @@ public class QueueService {
         return board;
     }
 
-    // ─── ADVANCE QUEUE — STAFF CLICKS "NEXT" ───────────────────────────────────
+    // ─── COMPLETE CURRENT & CALL NEXT — NOW HAPPENS IN ONE CLICK ───────────────
 
     @Transactional
     public Map<String, Object> advanceQueue(Long doctorId) {
         String today = LocalDate.now().toString();
         String redisKey = "queue:doctor:" + doctorId + ":" + today;
 
-        // Remove the first token from the waiting list (the one just finished)
-        // Remove the first token from the waiting list (the one just finished)
-        Object finishedToken = redisTemplate.opsForList().leftPop(redisKey + ":waiting");
+        Object currentTokenObj = redisTemplate.opsForValue().get(redisKey + ":current");
 
-        // Mark that token as COMPLETED in PostgreSQL, and complete its appointment too
-        if (finishedToken != null) {
-            int tokenNum = Integer.parseInt(finishedToken.toString());
+        if (currentTokenObj != null) {
             queueTokenRepository
                     .findFirstByDoctorIdAndStatusOrderByTokenNumberAsc(doctorId, "IN_PROGRESS")
                     .ifPresent(qt -> {
@@ -225,15 +221,11 @@ public class QueueService {
                         }
                     });
         }
-        // Get next token in line
-        List<Object> remainingList = redisTemplate.opsForList().range(redisKey + ":waiting", 0, -1);
-        Object nextTokenObj = remainingList != null && !remainingList.isEmpty() ? remainingList.get(0) : null;
+
+        Object nextTokenObj = redisTemplate.opsForList().leftPop(redisKey + ":waiting");
 
         if (nextTokenObj != null) {
-            // Set next token as current
             redisTemplate.opsForValue().set(redisKey + ":current", nextTokenObj.toString());
-
-            // Mark as IN_PROGRESS in PostgreSQL
             int nextTokenNum = Integer.parseInt(nextTokenObj.toString());
             queueTokenRepository
                     .findFirstByDoctorIdAndStatusOrderByTokenNumberAsc(doctorId, "WAITING")
@@ -244,16 +236,18 @@ public class QueueService {
                         }
                     });
 
-            // Check if anyone is 2 tokens away — fire "your turn soon" alert
-            if (remainingList.size() >= 2) {
-                int alertToken = Integer.parseInt(remainingList.get(1).toString());
+            List<Object> remainingList = redisTemplate.opsForList().range(redisKey + ":waiting", 0, -1);
+            if (remainingList != null && !remainingList.isEmpty()) {
+                int alertToken = Integer.parseInt(remainingList.get(0).toString());
                 sendNearbyAlert(doctorId, alertToken);
             }
+        } else {
+            redisTemplate.delete(redisKey + ":current");
         }
 
-        int waitingCount = remainingList != null ? remainingList.size() : 0;
+        List<Object> waitingList = redisTemplate.opsForList().range(redisKey + ":waiting", 0, -1);
+        int waitingCount = waitingList != null ? waitingList.size() : 0;
 
-        // Broadcast to all patients
         Map<String, Object> update = new HashMap<>();
         update.put("event", "QUEUE_ADVANCED");
         update.put("currentToken", nextTokenObj != null ? nextTokenObj : 0);
@@ -270,7 +264,6 @@ public class QueueService {
         String today = LocalDate.now().toString();
         String redisKey = "queue:doctor:" + doctorId + ":" + today;
 
-        // Move first token to the back of the waiting list
         Object skippedToken = redisTemplate.opsForList().leftPop(redisKey + ":waiting");
         if (skippedToken != null) {
             redisTemplate.opsForList().rightPush(redisKey + ":waiting", skippedToken);
@@ -332,7 +325,6 @@ public class QueueService {
         messagingTemplate.convertAndSend("/topic/queue/" + doctorId, update);
         return update;
     }
-    // ─── GET PATIENT'S TOKEN STATUS ─────────────────────────────────────────────
 
     public Map<String, Object> getPatientTokenStatus(Long appointmentId) {
         String today = LocalDate.now().toString();
@@ -349,7 +341,6 @@ public class QueueService {
         int currentToken = currentTokenObj != null ? Integer.parseInt(currentTokenObj.toString()) : 0;
         int myToken = token.getTokenNumber();
 
-        // Calculate how many are ahead of this patient
         int patientsAhead = 0;
         if (waitingList != null) {
             for (Object t : waitingList) {
@@ -368,10 +359,7 @@ public class QueueService {
         return status;
     }
 
-    // ─── PRIVATE: SEND "YOUR TURN SOON" ALERT ───────────────────────────────────
-
     private void sendNearbyAlert(Long doctorId, int tokenNumber) {
-        // Find the appointment for this token and send FCM push
         queueTokenRepository
                 .findFirstByDoctorIdAndStatusOrderByTokenNumberAsc(doctorId, "WAITING")
                 .ifPresent(qt -> {
@@ -385,6 +373,7 @@ public class QueueService {
                     }
                 });
     }
+
     public List<Map<String, Object>> getPendingCheckins(Long doctorId) {
         LocalDate today = LocalDate.now();
         List<Appointment> appointments = appointmentRepository.findByDoctorId(doctorId);
