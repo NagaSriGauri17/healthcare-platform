@@ -6,7 +6,7 @@ import com.healthcare.healthcare_platform.service.PatientService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
+import com.healthcare.healthcare_platform.service.PatientCodeService;
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +16,7 @@ import java.util.Map;
 public class PatientController {
 
     private final PatientService patientService;
+    private final PatientCodeService patientCodeService;
 
     @GetMapping("/profile/{userId}")
     public ResponseEntity<User> getProfile(@PathVariable Long userId) {
@@ -67,6 +68,10 @@ public class PatientController {
                 request.get("age") != null ? Integer.valueOf(request.get("age").toString()) : null
         );
         return ResponseEntity.ok(member);
+    }
+    @GetMapping("/code")
+    public ResponseEntity<String> getPatientCode(@RequestParam Long hospitalId, @RequestParam Long userId) {
+        return ResponseEntity.ok(patientCodeService.getPatientCode(hospitalId, userId));
     }
 
     @DeleteMapping("/family/{memberId}")
