@@ -1,5 +1,5 @@
 package com.healthcare.healthcare_platform.entity;
-
+import jakarta.persistence.Transient;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -20,6 +20,25 @@ public class Appointment {
     @ManyToOne
     @JoinColumn(name = "doctor_id", nullable = false)
     private Doctor doctor;
+
+    @Transient
+    private String displayId;
+
+    public String getDisplayId() {
+        if (displayId != null) return displayId;
+        if (doctor != null && doctor.getHospital() != null) {
+            String hospitalName = doctor.getHospital().getName().toLowerCase();
+            String prefix;
+            if (hospitalName.contains("apollo")) prefix = "AP";
+            else if (hospitalName.contains("kamineni")) prefix = "KM";
+            else if (hospitalName.contains("manipal")) prefix = "MP";
+            else if (hospitalName.contains("sunrise")) prefix = "SR";
+            else if (hospitalName.contains("andhra")) prefix = "AH";
+            else prefix = "AP";
+            return prefix + "-" + id;
+        }
+        return "APT-" + id;
+    }
 
     @ManyToOne
     @JoinColumn(name = "slot_id", nullable = false)
