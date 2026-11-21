@@ -33,4 +33,13 @@ public class User {
     private String otpCode;
 
     private Long hospitalId;
+
+    // Patient details collected at sign-up (editable later from the profile screen)
+    private Integer age;
+
+    private String address;
+
+    private String emergencyPhone;
+
+    private Boolean profileComplete;
 }
