@@ -94,8 +94,73 @@ public class SlotService {
     }
 
     public List<Slot> getAvailableSlots(Long doctorId, LocalDate date) {
+        ensureSlotsForDate(doctorId, date);
         return slotRepository.findByDoctorIdAndDateAndStatusOrderByStartTime(
                 doctorId, date, "AVAILABLE");
+    }
+
+    /**
+     * Creates the slots for one date from the doctor's weekly schedule, if they do not exist yet.
+     * Both the patient app and the hospital portal read slots through getAvailableSlots, so they
+     * always see the same slots (and the same booked/free status).
+     */
+    private synchronized void ensureSlotsForDate(Long doctorId, LocalDate date) {
+        LocalDate today = LocalDate.now();
+        if (date.isBefore(today) || date.isAfter(today.plusDays(60))) return;
+        if (!slotRepository.findByDoctorIdAndDate(doctorId, date).isEmpty()) return;
+        if (dateMarkRepository.findByDoctorIdAndDate(doctorId, date).isPresent()) return;
+
+        Doctor doctor = doctorRepository.findById(doctorId).orElse(null);
+        if (doctor == null) return;
+
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+        String dayOfWeek = date.getDayOfWeek().name().substring(0, 3);
+        List<Slot> toSave = new ArrayList<>();
+
+        for (Schedule schedule : scheduleRepository.findByDoctorId(doctorId)) {
+            if (Boolean.FALSE.equals(schedule.getIsAvailable())) continue;
+            if (!schedule.getDayOfWeek().substring(0, 3).equalsIgnoreCase(dayOfWeek)) continue;
+
+            LocalTime current = LocalTime.parse(schedule.getStartTime(), timeFormatter);
+            LocalTime end = LocalTime.parse(schedule.getEndTime(), timeFormatter);
+            int minutes = schedule.getSlotDurationMinutes() == null ? 30 : schedule.getSlotDurationMinutes();
+
+            while (current.plusMinutes(minutes).compareTo(end) <= 0) {
+                Slot slot = new Slot();
+                slot.setSchedule(schedule);
+                slot.setDoctor(doctor);
+                slot.setDate(date);
+                slot.setStartTime(current.format(timeFormatter));
+                slot.setEndTime(current.plusMinutes(minutes).format(timeFormatter));
+                slot.setStatus("AVAILABLE");
+                toSave.add(slot);
+                current = current.plusMinutes(minutes);
+            }
+        }
+        if (!toSave.isEmpty()) slotRepository.saveAll(toSave);
+    }
+
+    /** Gives every doctor who has no weekly schedule yet a default one: Mon–Sat, 09:00–13:00, 30-minute slots. */
+    public int seedDefaultSchedules() {
+        String[] days = {"MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
+        int doctorsUpdated = 0;
+        for (Doctor doctor : doctorRepository.findAll()) {
+            if (!scheduleRepository.findByDoctorId(doctor.getId()).isEmpty()) continue;
+            List<Schedule> rows = new ArrayList<>();
+            for (String day : days) {
+                Schedule s = new Schedule();
+                s.setDoctor(doctor);
+                s.setDayOfWeek(day);
+                s.setStartTime("09:00");
+                s.setEndTime("13:00");
+                s.setSlotDurationMinutes(30);
+                s.setIsAvailable(true);
+                rows.add(s);
+            }
+            scheduleRepository.saveAll(rows);
+            doctorsUpdated++;
+        }
+        return doctorsUpdated;
     }
 
     // ───────── Date marks (calendar) ─────────

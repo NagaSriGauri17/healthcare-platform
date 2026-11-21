@@ -38,7 +38,7 @@ public class QueueService {
     @Transactional
     public Appointment walkInBooking(Long doctorId, Long slotId,
                                      String patientName, String patientPhone) {
-        Slot slot = slotRepository.findById(slotId)
+        Slot slot = slotRepository.findByIdForUpdate(slotId)
                 .orElseThrow(() -> new RuntimeException("Slot not found"));
 
         if (!slot.getStatus().equals("AVAILABLE")) {

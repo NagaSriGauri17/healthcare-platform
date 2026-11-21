@@ -26,7 +26,7 @@ public class AppointmentService {
 
     @Transactional
     public Appointment initiateBooking(Long userId, Long slotId, String notes) {
-        Slot slot = slotRepository.findById(slotId)
+        Slot slot = slotRepository.findByIdForUpdate(slotId)
                 .orElseThrow(() -> new RuntimeException("Slot not found"));
 
         if (!slot.getStatus().equals("AVAILABLE")) {

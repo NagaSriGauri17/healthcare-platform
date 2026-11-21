@@ -37,6 +37,12 @@ public class ScheduleController {
         return ResponseEntity.ok(slotService.generateSlots(doctorId));
     }
 
+    /** One-time helper: gives doctors without any weekly schedule a default one (Mon–Sat, 09:00–13:00). */
+    @PostMapping("/seed-defaults")
+    public ResponseEntity<java.util.Map<String, Object>> seedDefaults() {
+        return ResponseEntity.ok(java.util.Map.of("doctorsUpdated", slotService.seedDefaultSchedules()));
+    }
+
     @GetMapping("/doctor/{doctorId}/slots")
     public ResponseEntity<List<Slot>> getSlots(
             @PathVariable Long doctorId,
