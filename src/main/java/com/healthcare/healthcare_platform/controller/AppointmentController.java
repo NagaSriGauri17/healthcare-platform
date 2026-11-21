@@ -31,6 +31,15 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.confirmBooking(appointmentId));
     }
 
+    @PostMapping("/{appointmentId}/complete")
+    public ResponseEntity<?> complete(@PathVariable Long appointmentId) {
+        try {
+            return ResponseEntity.ok(appointmentService.completeAppointment(appointmentId));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     @PostMapping("/{appointmentId}/cancel")
     public ResponseEntity<Appointment> cancel(@PathVariable Long appointmentId) {
         return ResponseEntity.ok(appointmentService.cancelBooking(appointmentId));

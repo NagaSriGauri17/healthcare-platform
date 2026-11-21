@@ -217,6 +217,9 @@ public class QueueService {
                         if (qt.getAppointment() != null) {
                             Appointment apt = qt.getAppointment();
                             apt.setStatus("COMPLETED");
+                            if (!"REFUNDED".equals(apt.getPaymentStatus())) {
+                                apt.setPaymentStatus("PAID");
+                            }
                             appointmentRepository.save(apt);
                         }
                     });

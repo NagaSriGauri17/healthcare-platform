@@ -71,6 +71,26 @@ public class AppointmentService {
         return appointmentRepository.save(appointment);
     }
 
+    /**
+     * Treatment finished: the appointment becomes COMPLETED and its consultation fee counts as
+     * collected (paymentStatus PAID), so it shows up in the hospital's revenue and transactions.
+     */
+    @Transactional
+    public Appointment completeAppointment(Long appointmentId) {
+        Appointment appointment = appointmentRepository.findById(appointmentId)
+                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+
+        if ("CANCELLED".equals(appointment.getStatus())) {
+            throw new RuntimeException("A cancelled appointment cannot be completed");
+        }
+
+        appointment.setStatus("COMPLETED");
+        if (!"REFUNDED".equals(appointment.getPaymentStatus())) {
+            appointment.setPaymentStatus("PAID");
+        }
+        return appointmentRepository.save(appointment);
+    }
+
     @Transactional
     public Appointment cancelBooking(Long appointmentId) {
         Appointment appointment = appointmentRepository.findById(appointmentId)
