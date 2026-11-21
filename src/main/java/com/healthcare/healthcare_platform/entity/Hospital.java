@@ -3,6 +3,8 @@ package com.healthcare.healthcare_platform.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "hospitals")
 @Data
@@ -28,4 +30,15 @@ public class Hospital {
     private Double latitude;
 
     private Double longitude;
+
+    // ICU beds / emergency desk — filled in by the hospital itself (null = not set yet)
+    private Integer icuBedsTotal;
+
+    private Integer icuBedsAvailable;
+
+    private Boolean emergencyOpen;
+
+    private String emergencyContact;
+
+    private LocalDateTime bedsUpdatedAt;
 }

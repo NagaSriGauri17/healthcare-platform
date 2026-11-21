@@ -1,5 +1,6 @@
 package com.healthcare.healthcare_platform.controller;
 
+import com.healthcare.healthcare_platform.entity.DoctorDateMark;
 import com.healthcare.healthcare_platform.entity.Schedule;
 import com.healthcare.healthcare_platform.entity.Slot;
 import com.healthcare.healthcare_platform.service.SlotService;
@@ -41,5 +42,42 @@ public class ScheduleController {
             @PathVariable Long doctorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(slotService.getAvailableSlots(doctorId, date));
+    }
+
+    // ───────── Calendar marks: grey = REMEMBER, red = UNAVAILABLE ─────────
+
+    @GetMapping("/doctor/{doctorId}/marks")
+    public ResponseEntity<List<DoctorDateMark>> getMarks(@PathVariable Long doctorId,
+                                                         @RequestParam int year) {
+        return ResponseEntity.ok(slotService.getDateMarks(doctorId, year));
+    }
+
+    @PostMapping("/doctor/{doctorId}/marks")
+    public ResponseEntity<?> setMark(@PathVariable Long doctorId,
+                                     @RequestBody Map<String, Object> request) {
+        if (request.get("date") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Date is required"));
+        }
+        try {
+            SlotService.MarkResult result = slotService.setDateMark(
+                    doctorId,
+                    LocalDate.parse(request.get("date").toString()),
+                    request.get("type") == null ? null : request.get("type").toString(),
+                    request.get("note") == null ? null : request.get("note").toString());
+            return ResponseEntity.ok(Map.of(
+                    "date", result.mark().getDate().toString(),
+                    "type", result.mark().getType(),
+                    "note", result.mark().getNote() == null ? "" : result.mark().getNote(),
+                    "bookedSlots", result.bookedSlots()));
+        } catch (IllegalArgumentException | java.time.format.DateTimeParseException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/doctor/{doctorId}/marks")
+    public ResponseEntity<Void> clearMark(@PathVariable Long doctorId,
+                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        slotService.clearDateMark(doctorId, date);
+        return ResponseEntity.noContent().build();
     }
 }

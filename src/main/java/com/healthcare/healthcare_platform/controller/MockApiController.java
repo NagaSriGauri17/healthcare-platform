@@ -12,36 +12,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class MockApiController {
 
-    // ─── EMERGENCY — ICU BED AVAILABILITY ──────────────────────────────────────
-
-    @GetMapping("/api/emergency/beds")
-    public ResponseEntity<List<Map<String, Object>>> getEmergencyBeds() {
-        List<Map<String, Object>> beds = new ArrayList<>();
-
-        beds.add(createHospitalBeds("Apollo Hospital", "Vijayawada", 4, 12, true));
-        beds.add(createHospitalBeds("KIMS Hospital", "Vijayawada", 1, 8, true));
-        beds.add(createHospitalBeds("Andhra Hospitals", "Vijayawada", 0, 6, false));
-        beds.add(createHospitalBeds("NRI General Hospital", "Guntur", 3, 10, true));
-        beds.add(createHospitalBeds("Ramesh Hospitals", "Vijayawada", 2, 15, true));
-
-        return ResponseEntity.ok(beds);
-    }
-
-    private Map<String, Object> createHospitalBeds(String name, String city,
-                                                   int available, int total,
-                                                   boolean emergencyOpen) {
-        Map<String, Object> hospital = new HashMap<>();
-        hospital.put("hospitalName", name);
-        hospital.put("city", city);
-        hospital.put("icuBedsAvailable", available);
-        hospital.put("icuBedsTotal", total);
-        hospital.put("emergencyOpen", emergencyOpen);
-        hospital.put("emergencyContact", "0866-" + (100000 + new Random().nextInt(900000)));
-        hospital.put("lastUpdated", LocalDateTime.now().format(
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
-        return hospital;
-    }
-
     // ─── AMBULANCE BOOKING ───────────────────────────────────────────────────────
 
     @PostMapping("/api/ambulance/book")
