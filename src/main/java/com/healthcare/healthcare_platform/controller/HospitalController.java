@@ -83,6 +83,66 @@ public class HospitalController {
         return ResponseEntity.ok(hospitalService.findNearbyHospitals(lat, lng, radius));
     }
 
+    /**
+     * Search used by the patient app, 10 results per page.
+     * type=city: hospitals in that city (up to ~150). type=name: hospitals with that name in
+     * Andhra Pradesh, Telangana, Karnataka, Tamil Nadu and Maharashtra.
+     * Hospitals registered on ArogyaCare (bookable) always come first.
+     */
+    @GetMapping("/discover")
+    public ResponseEntity<Map<String, Object>> discover(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "city") String type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        size = Math.max(1, Math.min(size, 20));
+        page = Math.max(0, page);
+        String query = q.trim();
+        boolean byName = "name".equalsIgnoreCase(type);
+
+        List<Map<String, Object>> combined = new ArrayList<>();
+        java.util.Set<String> seenNames = new java.util.HashSet<>();
+
+        List<Hospital> registered = byName
+                ? hospitalService.searchByName(query)
+                : hospitalService.searchByCity(query);
+        for (Hospital h : registered) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", h.getId());
+            m.put("name", h.getName());
+            m.put("address", h.getAddress());
+            m.put("city", h.getCity());
+            m.put("phone", h.getPhone());
+            m.put("rating", h.getRating());
+            m.put("latitude", h.getLatitude());
+            m.put("longitude", h.getLongitude());
+            m.put("registered", true);
+            combined.add(m);
+            seenNames.add(String.valueOf(h.getName()).toLowerCase().replaceAll("[^a-z0-9]", ""));
+        }
+        int registeredCount = combined.size();
+
+        for (Map<String, Object> place : googleMapsService.discoverHospitals(byName ? "name" : "city", query)) {
+            String norm = String.valueOf(place.get("name")).toLowerCase().replaceAll("[^a-z0-9]", "");
+            if (seenNames.contains(norm)) continue;
+            combined.add(place);
+        }
+
+        int total = combined.size();
+        int from = Math.min(page * size, total);
+        int to = Math.min(from + size, total);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("content", combined.subList(from, to));
+        response.put("page", page);
+        response.put("size", size);
+        response.put("totalElements", total);
+        response.put("totalPages", (int) Math.ceil(total / (double) size));
+        response.put("registeredCount", registeredCount);
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("/find-by-city")
     public ResponseEntity<List<Map<String, Object>>> liveSearch(
             @RequestParam String city) {
